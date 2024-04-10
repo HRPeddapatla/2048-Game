@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048 Game</title>
+    <style>
+        /* Webpage styling for the 2048 site */
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #f2f2f2;
+        }
+        /* Styling to keep the grid in the center of the page */
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        /* Creates a margin for the game grid */
+        .game-container {
+            display: inline-block;
+            margin-top: 20px;
+        }
+        /* Styling for each individual tile in the game grid */
+        .cell {
+            width: 120px;
+            height: 120px;
+            background-color: #ddd;
+            border: 1px solid #aaa;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            font-weight: bold;
+            margin: -1px;
+        }
+        /* Styling for each row in the grid */
+        .row {
+            display: flex;
+        }
+        /* Styling for the score information */
+        #scoreContainer {
+            margin-bottom: 10px;
+        }
+        /* Styling for the score value and the end and lose game messages */
+        #scoreValue, #highScoreValue, #gameMessage {
+            font-size: 24px;
+            display: inline-block;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        /* Styling for the score text */
+        .scoreLabel {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        /* Styling for the Restart Game button to center the button and set size. */
+        #restartBtn {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>2048 Game</h1>
+    <div id="scoreContainer">
+        <span class="scoreLabel">Score:</span><span id="scoreValue"> 0</span>
+        <span class="scoreLabel">High Score:</span><span id="highScoreValue"> 0</span>
+        <div id="gameMessage"></div>
+    </div>
+    <div class="game-container" id="gameContainer">
+        <!-- Cells will be dynamically generated here -->
+    </div>
+    <button id="restartBtn">Restart Game</button>
+
+    <script>
+        const size = 4; // Size of the game grid
+        let grid = Array.from({ length: size }, () => Array(size).fill(0)); // Initialize grid with zeros
+        let score = 0; // Initialize the score of the game
+        let highScore = localStorage.getItem('highScore') || 0; // Initialize the high score of the game
+
+        // Function to initialize the game grid
+        function initGrid() {
+            const gameContainer = document.getElementById('gameContainer');
+            gameContainer.innerHTML = '';
+
+            for (let i = 0; i < size; i++) {
+                const row = document.createElement('div');
+                row.classList.add('row');
+                for (let j = 0; j < size; j++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.id = `cell_${i}_${j}`;
+                    row.appendChild(cell);
+                }
+                gameContainer.appendChild(row);
+            }
+
+            // Call functions to initialize the game, always spawn two tiles
+            generateRandomTile();
+            generateRandomTile();
+            updateGrid();
+            updateScore();
+            updateHighScore();
+        }
+
+        // Function to update the grid display
+        function updateGrid() {
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    const cell = document.getElementById(`cell_${i}_${j}`);
+                    cell.textContent = grid[i][j] === 0 ? '' : grid[i][j];
+                    cell.style.backgroundColor = getTileColor(grid[i][j]);
+                }
+            }
+        }
+
+        // Function to generate random tiles as the user uses the key
+        function generateRandomTile() {
+            const emptyCells = [];
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    if (grid[i][j] === 0) {
+                        emptyCells.push({ row: i, col: j });
+                    }
+                }
+            }
+
+            if (emptyCells.length > 0) {
+                const { row, col } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                grid[row][col] = 2; // Always spawn a 2 tile
+            }
+        }
+
+        // Function to handle keyboard input
+        // Only allowed to have four directions: Up, Down, Right, Left
+        document.addEventListener('keydown', function(event) {
+            const key = event.key;
+            let moved = false;
+
+            switch(key) {
+                case 'ArrowUp':
+                    moved = moveTiles(-1, 0);
+                    break;
+                case 'ArrowDown':
+                    moved = moveTiles(1, 0);
+                    break;
+                case 'ArrowLeft':
+                    moved = moveTiles(0, -1);
+                    break;
+                case 'ArrowRight':
+                    moved = moveTiles(0, 1);
+                    break;
+            }
+
+            if (moved) {
+                generateRandomTile();
+                updateGrid();
+                updateScore();
+                updateHighScore();
+            }
+
+            checkGameStatus();
+        });
+
+        // Function to move tiles in the specified directions: Up, Down, Right, Left
+        function moveTiles(deltaRow, deltaCol) {
+            let moved = false;
+            let movedTiles = Array.from({ length: size }, () => Array(size).fill(false)); // Initialize array to track and display the moved tiles
+            
+            // Iterate over the grid and move the tiles in the specified direction
+            for (let i = deltaRow === 1 ? size - 1 : (deltaRow === -1 ? 0 : 0); deltaRow === 1 ? i >= 0 : (deltaRow === -1 ? i < size : i < size); deltaRow === 1 ? i-- : (deltaRow === -1 ? i++ : i++)) {
+                for (let j = deltaCol === 1 ? size - 1 : (deltaCol === -1 ? 0 : 0); deltaCol === 1 ? j >= 0 : (deltaCol === -1 ? j < size : j < size); deltaCol === 1 ? j-- : (deltaCol === -1 ? j++ : j++)) {
+                    if (grid[i][j] !== 0) {
+                        let newRow = i + deltaRow;
+                        let newCol = j + deltaCol;
+                        while (newRow >= 0 && newRow < size && newCol >= 0 && newCol < size && grid[newRow][newCol] === 0) {
+                            grid[newRow][newCol] = grid[i][j];
+                            grid[i][j] = 0;
+                            i = newRow;
+                            j = newCol;
+                            newRow += deltaRow;
+                            newCol += deltaCol;
+                            moved = true;
+                        }
+                        if (newRow >= 0 && newRow < size && newCol >= 0 && newCol < size && grid[newRow][newCol] === grid[i][j] && !movedTiles[newRow][newCol]) {
+                            const mergedTile = mergeTiles({ value: grid[newRow][newCol], position: { row: newRow, col: newCol } }, { value: grid[i][j], position: { row: i, col: j } });
+                            if (mergedTile !== null) {
+                                grid[newRow][newCol] = mergedTile.value;
+                                grid[i][j] = 0;
+                                score += mergedTile.value;
+                                moved = true;
+                                movedTiles[newRow][newCol] = true;
+                            }
+                        }
+                    }
+                }
+            }
+            return moved;
+        }
+
+        // Function to merge tiles
+        // Checks to make sure the tiles are the same value otherwise won't let them merge
+        function mergeTiles(tile1, tile2) {
+            if (tile1.value === tile2.value) {
+                var newTileValue = tile1.value * 2;
+                var newTilePosition = tile1.position;
+                return { value: newTileValue, position: newTilePosition };
+            } else {
+                return null;
+            }
+        }
+
+        // Function to set the color of a tile for every merge
+        function getTileColor(value) {
+            const rainbowColors = [
+            '#ff0000', // Red
+            '#ffa500', // Orange
+            '#ffff00', // Yellow
+            '#7fff00', // Chartreuse
+            '#006400', // Dark Green
+            '#00ffff', // Cyan
+            '#0000ff', // Blue
+            '#87ceeb', // Sky Blue
+            '#ee82ee', // Violet
+            '#ff1493'  // Deep Pink
+            ];
+            if (value === 0) {
+                return '#ddd';
+            } else {
+                // Map value to rainbow color index, ten colors for 2^10 = 2048
+                const index = Math.log2(value) - 1;
+                return rainbowColors[Math.min(index, rainbowColors.length - 1)];
+            }
+        }
+
+        // Function to update the score display
+        function updateScore() {
+            let maxBlock = 0;
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    maxBlock = Math.max(maxBlock, grid[i][j]);
+                }
+            }
+            score = maxBlock;
+            document.getElementById('scoreValue').textContent = score;
+        }
+
+        // Function to update the high score display
+        function updateHighScore() {
+            highScore = Math.max(highScore, score);
+            document.getElementById('highScoreValue').textContent = highScore;
+            localStorage.setItem('highScore', highScore); // Store high score in local storage
+        }
+
+        // Function to check if the game is over
+        // Displays "You Lose!" or "You Win!"
+        function checkGameStatus() {
+            if (!canMoveTiles() && score !== 2048) {
+                document.getElementById('gameMessage').textContent = "You Lose!";
+            } else if (score === 2048) {
+                document.getElementById('gameMessage').textContent = "You Win!";
+            }
+        }
+
+        // Function to check if tiles can be moved
+        // Checks if the tiles next to it are empty or have the same value
+        function canMoveTiles() {
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    if (grid[i][j] === 0) {
+                        return true;
+                    }
+                    if ((i < size - 1 && grid[i][j] === grid[i + 1][j]) || (j < size - 1 && grid[i][j] === grid[i][j + 1])) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Function to restart the game
+        // Calls Function initGrid() which resets the game at any point.
+        function restartGame() {
+            grid = Array.from({ length: size }, () => Array(size).fill(0));
+            score = 0;
+            document.getElementById('gameMessage').textContent = '';
+            initGrid();
+        }
+
+        // Initialize the game grid
+        initGrid();
+        // Event listener for the restart button
+        document.getElementById('restartBtn').addEventListener('click', restartGame);
+
+        
+    </script>
+</body>
+</html>
